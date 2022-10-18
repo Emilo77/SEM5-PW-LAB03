@@ -8,8 +8,8 @@ import java.util.function.IntBinaryOperator;
 
 public class MatrixRowSums {
 
-    private static final int ROWS = 10;
-    private static final int COLUMNS = 100;
+    private static final int ROWS = 3;
+    private static final int COLUMNS = 10;
 
     private static int rowIndex = 0;
 
@@ -40,9 +40,10 @@ public class MatrixRowSums {
         public void run() {
             try {
                 for(int i = 0; i < ROWS; i++) {
+                    int add = definition.applyAsInt(rowIndex, columnIndex);
                     mutex.acquire();
                     try {
-                        currentRowSum += definition.applyAsInt(rowIndex, columnIndex);
+                        currentRowSum += add;
                     } finally {
                         mutex.release();
                         barrier.await();
@@ -52,7 +53,6 @@ public class MatrixRowSums {
                 System.err.println("Thread interrupted");
                 Thread.currentThread().interrupt();
             }
-
         }
     }
 
@@ -135,22 +135,39 @@ public class MatrixRowSums {
 
     public static void main(String[] args) {
 
+        System.out.println("Starting...");
+
         Matrix matrix = new Matrix(ROWS, COLUMNS, (row, column) -> {
             int a = 2 * column + 1;
+            int cellId = column + row * COLUMNS;
+            try {
+                Thread.sleep((1000 - (cellId % 13) * 1000 / 12));
+            } catch (InterruptedException e) {
+                Thread t = Thread.currentThread();
+                t.interrupt();
+                System.err.println(t.getName() + " interrupted");
+            }
             return (row + 1) * (a % 4 - 2) * a;
         });
+        long startTime = System.currentTimeMillis();
         int[] rowSums = matrix.rowSums();
-        int[] rowSumsConcurrent = matrix.rowSumsConcurrent();
-
+        long usedTime = System.currentTimeMillis() - startTime;
+        System.out.println("Sequential execution took: " + usedTime + "ms");
+        System.out.println("Result:");
         for (int i = 0; i < rowSums.length; i++) {
             System.out.println(i + " -> " + rowSums[i]);
         }
 
-        for (int i = 0; i < rowSumsConcurrent.length; i++) {
-            System.out.println(i + " -> " + rowSumsConcurrent[i]);
-        }
 
-        test(100, false); //change second parameter to true to see results
+        // concurrent computations
+        startTime = System.currentTimeMillis();
+        rowSums = matrix.rowSumsConcurrent();
+        usedTime = System.currentTimeMillis() - startTime;
+        System.out.println("Concurrent execution took: " + usedTime + "ms");
+        System.out.println("Result:");
+        for (int i = 0; i < rowSums.length; i++) {
+            System.out.println(i + " -> " + rowSums[i]);
+        }
     }
 
 }
